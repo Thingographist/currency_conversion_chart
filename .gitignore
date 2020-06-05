@@ -2,3 +2,5 @@
 .nrepl-port
 data.db
 plots/*html
+pom.xml
+target

@@ -1,8 +1,10 @@
 (ns grabber
+  (:gen-class)
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.string :as string]
             [clojure.xml :as xml]
-
+            [clojure.java.io :as io]
+            
             [clj-http.client :as http]
             [hiccup.page :refer [html5]]
             [cheshire.core :as json])
@@ -62,6 +64,7 @@
     (doseq [day (map inc (range (.lengthOfMonth base-date)))
             :let [current-date (.withDayOfMonth base-date day)]]
       (try
+        (println "⦁ Colllect currencies for" (str current-date))
         (->> (get-data current-date)
              (extract-currencies)
              (store day))
@@ -71,6 +74,10 @@
                            :error e}]
             (prn ::error day)
             (swap! errors conj error-msg)))))))
+
+(defn write-plot [file-name content]
+  (io/make-parents file-name)
+  (spit file-name content))
 
 (defn render-currency-plot [currency]
   (let [chart-data (jdbc/query db-spec (str "select * from " (name currency) " order by day"))
@@ -90,15 +97,23 @@
                   :style "width:100%; height: 100%"}]
            [:script (format "var node = document.getElementById('plot'); Plotly.newPlot(node, %s, %s);" 
                             (json/generate-string graph-data)
-                            (json/generate-string {:title "CNY"
-                                                   :font {:size "20"}
+                            (json/generate-string {:title  (name currency)
+                                                   :font   {:size "20"}
                                                    :height "800"}))]])
-         (spit (str "plots/" (name currency) ".html")))))
+         (write-plot (str "plots/" (name currency) ".html")))))
 
 (defn rendering []
   (doseq [c currencies]
+    (println "⦁ Render graph for" (name c))
     (render-currency-plot c)))
 
+(defn -main [& _]
+  (println "# Init tables")
+  (init-tables)
+  (println "# Collect currencies")
+  (collect-data)
+  (println "# Rendering")
+  (rendering))
 
 (comment
 
